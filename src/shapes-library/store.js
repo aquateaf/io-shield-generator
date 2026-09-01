@@ -1,4 +1,5 @@
 import { DEFAULT_SHAPES } from './defaults.js';
+import { t } from '../i18n.js';
 
 const KEY = 'io-shield-generator.shapes.v1';
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -44,7 +45,7 @@ export function downloadJson(data, filename) {
 export async function importLibrary(file) {
   const parsed = JSON.parse(await file.text());
   const shapes = Array.isArray(parsed) ? parsed : parsed.shapes;
-  if (!Array.isArray(shapes) || !shapes.every(isShape)) throw new Error('Файл библиотеки не содержит допустимых форм.');
+  if (!Array.isArray(shapes) || !shapes.every(isShape)) throw new Error(t('libraryBad'));
   return shapes;
 }
 

@@ -3,15 +3,16 @@ import { ADDITION, Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { portPrimitiveMeshes } from '../geometry/portGeometry.js';
 import { portWorldPosition } from '../positioning.js';
+import { t } from '../../i18n.js';
 
 // three-bvh-csg uses BVH acceleration and is substantially more suitable here than
 // polygon-splitting CSG: all boolean work runs locally and is invoked only on demand.
-const material = new THREE.MeshStandardMaterial({ color: 0x2c6bed, roughness: 0.55, metalness: 0.2 });
+const material = new THREE.MeshStandardMaterial({ color: 0x8a7a62, roughness: 0.62, metalness: 0.08 });
 
 function ensureCsgAttributes(geometry) {
   geometry.clearGroups();
   const position = geometry.getAttribute('position');
-  if (!position) throw new Error('Геометрия без координат.');
+  if (!position) throw new Error(t('geomNoCoords'));
   const normal = geometry.getAttribute('normal');
   if (!normal || normal.count !== position.count) geometry.computeVertexNormals();
   const uv = geometry.getAttribute('uv');
@@ -37,7 +38,7 @@ function combineBrushes(evaluator, brushes) {
 }
 
 export function buildFinalShield(baseMesh, state, onProgress = () => {}) {
-  if (!baseMesh) throw new Error('Сначала загрузите STL-заготовку.');
+  if (!baseMesh) throw new Error(t('generateNeedStl'));
   const evaluator = new Evaluator();
   evaluator.useGroups = false;
   evaluator.useCDTClipping = true;

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { t } from '../../i18n.js';
 
 const SEGMENTS = 20;
 
@@ -27,11 +28,11 @@ export function primitiveShape(primitive, tolerance = 0) {
     roundedRect(shape, primitive.x - w / 2, primitive.y - h / 2, w, h, r);
   } else if (primitive.type === 'polyline') {
     const points = primitive.points || [];
-    if (points.length < 3) throw new Error('Полилиния должна иметь хотя бы три точки.');
+    if (points.length < 3) throw new Error(t('polylineNeed3'));
     shape.moveTo(points[0][0], points[0][1]);
     points.slice(1).forEach(([x, y]) => shape.lineTo(x, y));
     shape.closePath();
-  } else throw new Error('Неизвестный примитив.');
+  } else throw new Error(t('unknownPrimitive'));
   return shape;
 }
 

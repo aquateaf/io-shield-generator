@@ -1,3 +1,5 @@
+import { t, formatNumber } from '../i18n.js';
+
 const MM_LIVE = /^-?\d*(?:[.,]\d{0,4})?$/;
 
 export function roundMm(value) {
@@ -5,9 +7,7 @@ export function roundMm(value) {
 }
 
 export function formatMm(value) {
-  if (!Number.isFinite(Number(value))) return '';
-  const text = roundMm(value).toFixed(4).replace(/\.?0+$/, '');
-  return (text === '-0' ? '0' : text).replace('.', ',');
+  return formatNumber(value);
 }
 
 export function parseMm(raw) {
@@ -64,11 +64,11 @@ export function bindMmInput(input, { apply, min, max, optional = false } = {}) {
         apply(null);
         return true;
       }
-      setFieldError(input, 'Поле не заполнено');
+      setFieldError(input, t('fieldEmpty'));
       return false;
     }
     if (parsed.incomplete) {
-      if (fromBlur) setFieldError(input, 'Поле не заполнено');
+      if (fromBlur) setFieldError(input, t('fieldEmpty'));
       return false;
     }
     let value = parsed.value;

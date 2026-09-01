@@ -1,5 +1,6 @@
 import { frameFromBounds, marginsFromFrame, portWorldPosition } from '../core/positioning.js';
 import { footprintAt } from '../core/geometry/portGeometry.js';
+import { t } from '../i18n.js';
 
 const HANDLE = 9;
 
@@ -15,11 +16,11 @@ export class TopView {
   }
   setGeometry(geometry) { this.geometry = geometry; this.snapshot = null; this.snapshotKey = ''; this.draw(); }
   beginFrameSelection() {
-    if (!this.state.bounds) return this.notify('Сначала загрузите STL.');
+    if (!this.state.bounds) return this.notify(t('loadStlFirst'));
     this.state.selectingFrame = true;
     this.state.frameSelected = true;
     this.canvas.classList.add('selecting-frame');
-    this.notify('Протяните прямоугольник по снимку модели — это будет рамка шилда.');
+    this.notify(t('dragFrame'));
     this.draw();
   }
   bounds() { return this.state.bounds; }
@@ -65,33 +66,36 @@ export class TopView {
   draw() {
     const c = this.canvas; const ratio = devicePixelRatio; const w = c.clientWidth; const h = c.clientHeight; if (!w || !h) return;
     c.width = w * ratio; c.height = h * ratio; this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0); const ctx = this.ctx;
-    ctx.clearRect(0, 0, w, h); ctx.fillStyle = '#0a1020'; ctx.fillRect(0, 0, w, h);
-    if (!this.state.bounds) { ctx.fillStyle = '#9aaccc'; ctx.font = '14px system-ui'; ctx.textAlign = 'center'; ctx.fillText('Загрузите STL, чтобы увидеть вид сверху', w / 2, h / 2); return; }
+    const css = getComputedStyle(document.documentElement);
+    const page = css.getPropertyValue('--scene-bg').trim() || '#e4d9c4';
+    const muted = css.getPropertyValue('--muted').trim() || '#6d6456';
+    const text = css.getPropertyValue('--text').trim() || '#2a241c';
+    const accent = css.getPropertyValue('--accent').trim() || '#8a4a28';
+    const accent2 = css.getPropertyValue('--accent-2').trim() || '#4a6740';
+    ctx.clearRect(0, 0, w, h); ctx.fillStyle = page; ctx.fillRect(0, 0, w, h);
+    if (!this.state.bounds) { ctx.fillStyle = muted; ctx.font = '14px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(t('topEmpty'), w / 2, h / 2); return; }
     const b = this.bounds(); this.drawSnapshot(ctx, w, h);
     const a = this.screen({ x: b.min.x, y: b.max.y }); const d = this.screen({ x: b.max.x, y: b.min.y });
-    ctx.strokeStyle = '#7f99bf'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.strokeRect(a.x, a.y, d.x - a.x, d.y - a.y); ctx.setLineDash([]);
+    ctx.strokeStyle = muted; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.strokeRect(a.x, a.y, d.x - a.x, d.y - a.y); ctx.setLineDash([]);
     const f = this.frame(); const fa = this.screen({ x: f.left, y: f.top }); const fd = this.screen({ x: f.right, y: f.bottom });
     const fw = fd.x - fa.x, fh = fd.y - fa.y;
     ctx.save();
-    ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(fa.x, fa.y, fw, fh); ctx.fillStyle = 'rgba(6, 10, 18, .55)'; ctx.fill('evenodd');
+    ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(fa.x, fa.y, fw, fh); ctx.fillStyle = 'rgba(42, 36, 28, .18)'; ctx.fill('evenodd');
     ctx.restore();
     const selected = this.state.frameSelected || this.state.selectingFrame;
-    ctx.fillStyle = selected ? 'rgba(57, 210, 180, .16)' : 'rgba(57, 210, 180, .08)';
+    ctx.fillStyle = selected ? 'rgba(74, 103, 64, .16)' : 'rgba(74, 103, 64, .08)';
     ctx.fillRect(fa.x, fa.y, fw, fh);
-    ctx.strokeStyle = selected ? '#5cffd4' : '#38d5b0';
-    ctx.lineWidth = selected ? 3 : 2;
-    ctx.shadowColor = selected ? 'rgba(56, 213, 176, .85)' : 'transparent';
-    ctx.shadowBlur = selected ? 10 : 0;
+    ctx.strokeStyle = selected ? accent2 : '#5a7450';
+    ctx.lineWidth = selected ? 2.5 : 2;
     ctx.strokeRect(fa.x, fa.y, fw, fh);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#d8faef'; ctx.font = '12px system-ui'; ctx.textAlign = 'left';
-    ctx.fillText('Рамка шилда  (0, 0)', fa.x + 8, fa.y - 10);
+    ctx.fillStyle = text; ctx.font = '12px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(t('frameLabel'), fa.x + 8, fa.y - 10);
     const size = `${(f.right - f.left).toFixed(1)} × ${(f.top - f.bottom).toFixed(1)} мм`;
     ctx.textAlign = 'right'; ctx.fillText(size, fd.x - 6, fd.y + 16);
     for (const handle of this.handles(f)) {
       const s = this.screen(handle);
-      ctx.fillStyle = selected || this.hover?.key === handle.key ? '#e8fff8' : '#7ff0d0';
-      ctx.strokeStyle = '#0b3d34';
+      ctx.fillStyle = selected || this.hover?.key === handle.key ? '#fffdf8' : '#eadfcb';
+      ctx.strokeStyle = text;
       ctx.lineWidth = 1.5;
       ctx.fillRect(s.x - HANDLE / 2, s.y - HANDLE / 2, HANDLE, HANDLE);
       ctx.strokeRect(s.x - HANDLE / 2, s.y - HANDLE / 2, HANDLE, HANDLE);
@@ -102,29 +106,30 @@ export class TopView {
       if (!Number.isFinite(Number(port.x)) || !Number.isFinite(Number(port.y))) continue;
       const p = portWorldPosition(f, port); const box = footprintAt(shape, p.x, p.y, port.tolerance ?? this.state.tolerance);
       const pa = this.screen({ x: box.minX, y: box.maxY }); const pd = this.screen({ x: box.maxX, y: box.minY });
-      ctx.fillStyle = port.id === this.state.selectedPort ? 'rgba(255, 197, 66, .56)' : 'rgba(69, 143, 255, .45)';
-      ctx.strokeStyle = port.id === this.state.selectedPort ? '#ffd166' : '#77adff';
+      ctx.fillStyle = port.id === this.state.selectedPort ? 'rgba(138, 74, 40, .38)' : 'rgba(61, 90, 128, .28)';
+      ctx.strokeStyle = port.id === this.state.selectedPort ? accent : '#3d5a80';
       ctx.lineWidth = port.id === this.state.selectedPort ? 2.5 : 1.5;
       ctx.fillRect(pa.x, pa.y, pd.x - pa.x, pd.y - pa.y); ctx.strokeRect(pa.x, pa.y, pd.x - pa.x, pd.y - pa.y);
     }
     if (this.state.selectingFrame && this.selectStart && this.selectionPreview) {
       const start = this.screen(this.selectStart), end = this.screen(this.selectionPreview);
-      ctx.fillStyle = 'rgba(255, 209, 102, .16)'; ctx.strokeStyle = '#ffd166'; ctx.setLineDash([5, 4]);
+      ctx.fillStyle = 'rgba(138, 74, 40, .16)'; ctx.strokeStyle = accent; ctx.setLineDash([5, 4]);
       ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
       ctx.fillRect(start.x, start.y, end.x - start.x, end.y - start.y);
       ctx.setLineDash([]);
     }
   }
   drawSnapshot(ctx, w, h) {
-    const b = this.bounds(); const key = `${w}x${h}:${this.geometry?.uuid}:${b.min.x},${b.min.y},${b.max.x},${b.max.y}`;
+    const b = this.bounds(); const theme = document.documentElement.dataset.theme;
+    const key = `${w}x${h}:${this.geometry?.uuid}:${b.min.x},${b.min.y},${b.max.x},${b.max.y}:${theme}`;
     if (key !== this.snapshotKey) {
-      this.snapshotKey = key; const image = document.createElement('canvas'); image.width = w; image.height = h; const ic = image.getContext('2d'); ic.fillStyle = '#344a69';
+      this.snapshotKey = key; const image = document.createElement('canvas'); image.width = w; image.height = h; const ic = image.getContext('2d');       ic.fillStyle = '#cbbfa6';
       if (this.geometry) {
         const p = this.geometry.getAttribute('position'); const zSpan = Math.max(.001, b.max.z - b.min.z);
         for (let i = 0; i < p.count; i += 3) {
           const av = this.screen({ x: p.getX(i), y: p.getY(i) }), bv = this.screen({ x: p.getX(i + 1), y: p.getY(i + 1) }), cv = this.screen({ x: p.getX(i + 2), y: p.getY(i + 2) });
           const z = ((p.getZ(i) + p.getZ(i + 1) + p.getZ(i + 2)) / 3 - b.min.z) / zSpan;
-          ic.fillStyle = `rgb(${38 + Math.round(z * 35)}, ${61 + Math.round(z * 45)}, ${91 + Math.round(z * 58)})`;
+          ic.fillStyle = `rgb(${170 + Math.round(z * 40)}, ${150 + Math.round(z * 28)}, ${120 + Math.round(z * 18)})`;
           ic.beginPath(); ic.moveTo(av.x, av.y); ic.lineTo(bv.x, bv.y); ic.lineTo(cv.x, cv.y); ic.closePath(); ic.fill();
         }
       } else {
@@ -156,10 +161,9 @@ export class TopView {
         this.state.selectedPort = port.id; this.state.frameSelected = false; this.change(); return;
       }
     }
-    if (!this.state.selectedShape) return this.notify('Выберите форму из библиотеки для размещения.');
+    if (!this.state.selectedShape) return this.notify(t('pickShape'));
     if (p.x < f.left || p.x > f.right || p.y > f.top || p.y < f.bottom) {
       this.state.frameSelected = true;
-      this.notify('Клик внутри рамки ставит порт. За край рамки можно потянуть, снаружи — выделить рамку.');
       this.change();
       return;
     }
@@ -200,7 +204,7 @@ export class TopView {
         this.state.frame = { left: x1, right: x2, top: y2, bottom: y1 };
         this.state.margins = marginsFromFrame(b, this.state.frame);
         this.state.frameSelected = true;
-        this.notify('Рамка шилда выделена. Углы и стороны можно подвинуть мышью.');
+        this.notify(t('frameDrawn'));
       }
       this.state.selectingFrame = false; this.selectStart = null; this.selectionPreview = null; this.change();
     }
