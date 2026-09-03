@@ -303,36 +303,78 @@ function setupSketch(svg, shape) { let tool = null; let start = null; svg.parent
   svg.addEventListener('pointerdown', e => { if (!tool) return; start = point(e); svg.setPointerCapture(e.pointerId); }); svg.addEventListener('pointerup', e => { if (!start || !tool) return; const end = point(e); const dx = end.x - start.x, dy = end.y - start.y; if (Math.hypot(dx, dy) > .8) { if (tool === 'rect') shape.primitives.push({ type: 'rect', x: roundMm(start.x + dx / 2), y: roundMm(-(start.y + dy / 2)), width: roundMm(Math.abs(dx)), height: roundMm(Math.abs(dy)), radius: 0 }); else shape.primitives.push({ type: 'circle', x: roundMm(start.x), y: roundMm(-start.y), radius: roundMm(Math.hypot(dx, dy)) }); saveShapes(state.shapes); scheduleRender(); } start = null; tool = null; svg.classList.remove('drawing'); }); }
 
 function renderPorts() {
-  const host = document.querySelector('#ports-table'); document.querySelector('#port-count').textContent = `(${state.ports.length})`; const shapes = new Map(state.shapes.map(s => [s.id, s])); const frameWidth = state.frame ? state.frame.right - state.frame.left : 0; const frameSpanY = state.frame ? state.frame.top - state.frame.bottom : 0;
-  const mmCell = (attrs, value, placeholder = '') => `<span class="mm-wrap"><input ${attrs} type="text" inputmode="decimal" autocomplete="off" value="${value}" placeholder="${placeholder}"><span class="field-error" hidden></span></span>`;
-  host.innerHTML = state.ports.length ? `<table><thead><tr><th>${t('colShape')}</th><th>${t('colLeft')}</th><th>${t('colRight')}</th><th>${t('colTop')}</th><th>${t('colBottom')}</th><th>${t('colTol')}</th><th></th></tr></thead><tbody>${state.ports.map(p => `<tr class="${p.id === state.selectedPort ? 'active' : ''}" data-port-row="${p.id}"><td>${escapeHtml(shapes.get(p.shapeId)?.name || t('deletedShape'))}</td><td>${mmCell(`data-port="${p.id}:x"`, formatMm(p.x))}</td><td>${mmCell(`data-port-edge="${p.id}:right"`, formatMm(frameWidth - p.x))}</td><td>${mmCell(`data-port="${p.id}:y"`, formatMm(p.y))}</td><td>${mmCell(`data-port-edge="${p.id}:bottom"`, formatMm(frameSpanY - p.y))}</td><td>${mmCell(`data-port="${p.id}:tolerance"`, p.tolerance == null ? '' : formatMm(p.tolerance), formatMm(state.tolerance))}</td><td><button data-duplicate="${p.id}" title="${t('duplicate')}">⧉</button><button data-remove-port="${p.id}" class="danger" title="${t('remove')}">×</button></td></tr>`).join('')}</tbody></table>` : `<p class="note">${t('portsEmpty')}</p>`;
+  const host = document.querySelector('#ports-table');
+  document.querySelector('#port-count').textContent = `(${state.ports.length})`;
+  const shapes = new Map(state.shapes.map(s => [s.id, s]));
+  const frameWidth = state.frame ? state.frame.right - state.frame.left : 0;
+  const frameSpanY = state.frame ? state.frame.top - state.frame.bottom : 0;
+
+  const mmCell = (attrs, value, placeholder = '') =>
+    `<span class="mm-wrap"><input ${attrs} type="text" inputmode="decimal" autocomplete="off" value="${value}" placeholder="${placeholder}"><span class="field-error" hidden></span></span>`;
+
+  host.innerHTML = state.ports.length
+    ? `<table><thead><tr><th>${t('colShape')}</th><th>${t('colLeft')}</th><th>${t('colRight')}</th><th>${t('colTop')}</th><th>${t('colBottom')}</th><th>${t('colTol')}</th><th></th></tr></thead><tbody>${state.ports.map(p => {
+        const shape = shapes.get(p.shapeId);
+        const b = shape ? shapeBounds(shape) : { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+        const leftEdge = p.x + b.minX;
+        const rightEdge = frameWidth - p.x - b.maxX;
+        const topEdge = p.y - b.maxY;
+        const bottomEdge = frameSpanY - p.y - b.minY;
+        return `<tr class="${p.id === state.selectedPort ? 'active' : ''}" data-port-row="${p.id}"><td>${escapeHtml(shape?.name || t('deletedShape'))}</td><td>${mmCell(`data-port="${p.id}:x"`, formatMm(leftEdge))}</td><td>${mmCell(`data-port-edge="${p.id}:right"`, formatMm(rightEdge))}</td><td>${mmCell(`data-port="${p.id}:y"`, formatMm(topEdge))}</td><td>${mmCell(`data-port-edge="${p.id}:bottom"`, formatMm(bottomEdge))}</td><td>${mmCell(`data-port="${p.id}:tolerance"`, p.tolerance == null ? '' : formatMm(p.tolerance), formatMm(state.tolerance))}</td><td><button data-duplicate="${p.id}" title="${t('duplicate')}">⧉</button><button data-remove-port="${p.id}" class="danger" title="${t('remove')}">×</button></td></tr>`;
+      }).join('')}</tbody></table>`
+    : `<p class="note">${t('portsEmpty')}</p>`;
+
+  // --- Left / Top inputs ---
   host.querySelectorAll('[data-port]').forEach(el => {
     const [id, key] = el.dataset.port.split(':');
     bindMmInput(el, { optional: key === 'tolerance', apply: value => {
       const port = state.ports.find(p => p.id === id);
       if (!port) return;
       if (key !== 'tolerance' && !Number.isFinite(value)) return;
-      port[key] = value;
+      const shape = shapes.get(port.shapeId);
+      const b = shape ? shapeBounds(shape) : { minX: 0, maxX: 0, minY: 0, maxY: 0 };
       const spanX = state.frame ? state.frame.right - state.frame.left : frameWidth;
       const spanY = state.frame ? state.frame.top - state.frame.bottom : frameSpanY;
-      if (key === 'x') writeMm(host.querySelector(`[data-port-edge="${id}:right"]`), spanX - value);
-      if (key === 'y') writeMm(host.querySelector(`[data-port-edge="${id}:bottom"]`), spanY - value);
-    } });
+      if (key === 'x') {
+        port.x = value - b.minX;
+        writeMm(host.querySelector(`[data-port-edge="${id}:right"]`), spanX - port.x - b.maxX);
+      } else if (key === 'y') {
+        port.y = value + b.maxY;
+        writeMm(host.querySelector(`[data-port-edge="${id}:bottom"]`), spanY - port.y - b.minY);
+      } else {
+        port[key] = value;
+      }
+    }});
     el.addEventListener('mm-commit', refreshViews);
   });
+
+  // --- Right / Bottom inputs ---
   host.querySelectorAll('[data-port-edge]').forEach(el => {
     bindMmInput(el, { apply: value => {
       const [id, edge] = el.dataset.portEdge.split(':');
       const port = state.ports.find(p => p.id === id);
       if (!port || !state.frame || !Number.isFinite(value)) return;
+      const shape = shapes.get(port.shapeId);
+      const b = shape ? shapeBounds(shape) : { minX: 0, maxX: 0, minY: 0, maxY: 0 };
       const spanX = state.frame.right - state.frame.left;
       const spanY = state.frame.top - state.frame.bottom;
-      if (edge === 'right') { port.x = spanX - value; writeMm(host.querySelector(`[data-port="${id}:x"]`), port.x); }
-      else { port.y = spanY - value; writeMm(host.querySelector(`[data-port="${id}:y"]`), port.y); }
-    } });
+      if (edge === 'right') {
+        port.x = spanX - value - b.maxX;
+        writeMm(host.querySelector(`[data-port="${id}:x"]`), port.x + b.minX);
+      } else {
+        port.y = spanY - value - b.minY;
+        writeMm(host.querySelector(`[data-port="${id}:y"]`), port.y - b.maxY);
+      }
+    }});
     el.addEventListener('mm-commit', refreshViews);
   });
-  host.querySelectorAll('[data-port-row]').forEach(row => row.addEventListener('click', event => { if (event.target.closest('input, button, .mm-wrap')) return; state.selectedPort = row.dataset.portRow; scheduleRender(); }));
+
+  host.querySelectorAll('[data-port-row]').forEach(row => row.addEventListener('click', event => {
+    if (event.target.closest('input, button, .mm-wrap')) return;
+    state.selectedPort = row.dataset.portRow;
+    scheduleRender();
+  }));
+
   host.querySelectorAll('[data-remove-port]').forEach(btn => btn.addEventListener('click', e => {
     e.stopPropagation();
     btn.blur();
@@ -340,6 +382,7 @@ function renderPorts() {
     if (state.selectedPort === btn.dataset.removePort) state.selectedPort = null;
     scheduleRender();
   }));
+
   host.querySelectorAll('[data-duplicate]').forEach(btn => btn.addEventListener('click', e => {
     e.stopPropagation();
     btn.blur();
@@ -348,6 +391,7 @@ function renderPorts() {
     state.selectedPort = state.ports.at(-1).id;
     scheduleRender();
   }));
+
   renderWarnings(shapes);
 }
 
