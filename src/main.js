@@ -319,7 +319,7 @@ function renderPorts() {
         const leftEdge = p.x + b.minX;
         const rightEdge = frameWidth - p.x - b.maxX;
         const topEdge = p.y - b.maxY;
-        const bottomEdge = frameSpanY - p.y - b.minY;
+        const bottomEdge = frameSpanY - p.y + b.minY;
         return `<tr class="${p.id === state.selectedPort ? 'active' : ''}" data-port-row="${p.id}"><td>${escapeHtml(shape?.name || t('deletedShape'))}</td><td>${mmCell(`data-port="${p.id}:x"`, formatMm(leftEdge))}</td><td>${mmCell(`data-port-edge="${p.id}:right"`, formatMm(rightEdge))}</td><td>${mmCell(`data-port="${p.id}:y"`, formatMm(topEdge))}</td><td>${mmCell(`data-port-edge="${p.id}:bottom"`, formatMm(bottomEdge))}</td><td>${mmCell(`data-port="${p.id}:tolerance"`, p.tolerance == null ? '' : formatMm(p.tolerance), formatMm(state.tolerance))}</td><td><button data-duplicate="${p.id}" title="${t('duplicate')}">⧉</button><button data-remove-port="${p.id}" class="danger" title="${t('remove')}">×</button></td></tr>`;
       }).join('')}</tbody></table>`
     : `<p class="note">${t('portsEmpty')}</p>`;
@@ -340,7 +340,7 @@ function renderPorts() {
         writeMm(host.querySelector(`[data-port-edge="${id}:right"]`), spanX - port.x - b.maxX);
       } else if (key === 'y') {
         port.y = value + b.maxY;
-        writeMm(host.querySelector(`[data-port-edge="${id}:bottom"]`), spanY - port.y - b.minY);
+        writeMm(host.querySelector(`[data-port-edge="${id}:bottom"]`), spanY - port.y + b.minY);
       } else {
         port[key] = value;
       }
@@ -362,7 +362,7 @@ function renderPorts() {
         port.x = spanX - value - b.maxX;
         writeMm(host.querySelector(`[data-port="${id}:x"]`), port.x + b.minX);
       } else {
-        port.y = spanY - value - b.minY;
+        port.y = spanY - value + b.minY;
         writeMm(host.querySelector(`[data-port="${id}:y"]`), port.y - b.maxY);
       }
     }});
